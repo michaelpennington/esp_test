@@ -9,8 +9,11 @@
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp_hal::clock::CpuClock;
+use esp_hal::gpio::{Output, OutputConfig};
+use esp_hal::peripherals::RMT;
 use esp_hal::timer::timg::TimerGroup;
+use esp_hal::{clock::CpuClock, gpio::Level};
+use my_esp_project::neopixel::{HSV, NeoPixelDriver};
 use panic_rtt_target as _;
 
 extern crate alloc;
@@ -42,8 +45,12 @@ async fn main(spawner: Spawner) -> ! {
         esp_radio::wifi::new(&radio_init, peripherals.WIFI, Default::default())
             .expect("Failed to initialize Wi-Fi controller");
 
-    // TODO: Spawn some tasks
-    let _ = spawner;
+    spawner
+        .spawn(led(
+            peripherals.RMT,
+            Output::new(peripherals.GPIO8, Level::Low, OutputConfig::default()),
+        ))
+        .unwrap();
 
     loop {
         info!("Hello world!");
@@ -51,4 +58,20 @@ async fn main(spawner: Spawner) -> ! {
     }
 
     // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0/examples/src/bin
+}
+
+#[embassy_executor::task]
+async fn led(rmt: RMT<'static>, pin: Output<'static>) {
+    let mut neopixel = NeoPixelDriver::new(rmt, pin).unwrap();
+    let mut color = HSV {
+        h: 0.0,
+        s: 1.0,
+        v: 0.05,
+    };
+    loop {
+        neopixel.set_led(color).await.unwrap();
+        Timer::after(Duration::from_millis(250)).await;
+        info!("{}", color);
+        color.h = (color.h + 1.0) % 360.0;
+    }
 }
