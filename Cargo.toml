@@ -74,6 +74,7 @@ allocator-api2 = { version = "0.3.1", features = ["alloc"], default-features = f
 picoserve = { version = "0.17.1", default-features = false, features = ["defmt", "embassy", "alloc"] }
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
 serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }
+softfloat = "1.0.0"
 
 [dev-dependencies]
 embedded-test = { version = "0.7.0", features = [
