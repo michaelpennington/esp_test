@@ -41,7 +41,7 @@ extern crate alloc;
 
 const WIFI_SSID: &str = "wireless24!";
 const WIFI_PASSWORD: &str = "Rusty007!";
-const SOUND_BUF_SIZE: usize = 1024;
+const SOUND_BUF_SIZE: usize = 4000;
 const SAMPLE_RATE: u32 = 44100;
 const FREQUENCY: F32 = F32::from_native_f32(440.0);
 const AMPLITUDE: F32 = F32::from_u32(10_000);
