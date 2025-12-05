@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>ESP32 LED Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    input[type="color"] {
+      width: 100px;
+      height: 100px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>ESP32 NeoPixel</h1>
+  <p>Select a color:</p>
+  <input type="color" id="picker" onchange="updateColor(this.value)">
+  <script>
+    function updateColor(hex) {
+      // Remove '#' and send to server
+      fetch('/color?v=' + hex.substring(1));
+    }
+  </script>
+</body>
+
+</html>

@@ -1,5 +1,3 @@
-use core::fmt::Display;
-
 use defmt::Format;
 // use allocator_api2::boxed::Box;
 use embassy_time::{Duration, Instant, Timer};
@@ -13,20 +11,20 @@ use esp_hal::{
 
 pub struct NeoPixelDriver<'a> {
     channel: Channel<'a, Async, Tx>,
-    led: HSV,
+    led: RGB,
     last_data_sent: Instant,
     // fut: Option<Box<dyn Future<Output = Result<(), rmt::Error>>>>,
 }
 
 impl<'a> NeoPixelDriver<'a> {
     pub fn new(rmt: RMT<'a>, pin: impl PeripheralOutput<'a>) -> anyhow::Result<Self> {
-        let led = HSV::default();
+        let led = RGB::default();
         let rmt = Rmt::new(rmt, Rate::from_mhz(40))?.into_async();
         let tx_config = TxChannelConfig::default()
             .with_memsize(4)
             .with_clk_divider(1)
             .with_idle_output(true)
-            .with_carrier_level(Level::Low)
+            .with_idle_output_level(Level::Low)
             .with_carrier_modulation(false);
         let channel = rmt.channel0.configure_tx(pin, tx_config)?;
         Ok(Self {
@@ -37,8 +35,13 @@ impl<'a> NeoPixelDriver<'a> {
         })
     }
 
-    pub async fn set_led(&mut self, hsv: HSV) -> anyhow::Result<()> {
-        self.led = hsv;
+    pub async fn set_led(&mut self, rgb: RGB) -> anyhow::Result<()> {
+        self.led = rgb;
+        self.transmit().await
+    }
+
+    pub async fn set_led_hsv(&mut self, hsv: HSV) -> anyhow::Result<()> {
+        self.led = hsv.to_rgb();
         self.transmit().await
     }
 
@@ -47,7 +50,7 @@ impl<'a> NeoPixelDriver<'a> {
         if let Some(delta) = Duration::from_micros(200).checked_sub(elapsed) {
             Timer::after(delta).await;
         }
-        let codes = self.led.to_rgb().to_pulsecodes();
+        let codes = self.led.to_pulsecodes();
         self.channel.transmit(&codes).await?;
         // self.fut = Some(Box::new(fut) as dyn Future<Output = Result<_, _>>);
         self.last_data_sent = Instant::now();
@@ -62,20 +65,26 @@ pub struct RGB {
     pub b: u8,
 }
 
+impl Format for RGB {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "(r: {}, g: {}, b: {})", self.r, self.g, self.b)
+    }
+}
+
 impl RGB {
     pub fn to_pulsecodes(&self) -> [PulseCode; 25] {
         let mut codes = [PulseCode::default(); 25];
         let (mut r, mut g, mut b) = (self.r, self.g, self.b);
-        for i in 0..8 {
-            codes[0 * 8 + i] = if g & 0x80 != 0 { RMT_ONE } else { RMT_ZERO };
+        for code in &mut codes[..8] {
+            *code = if g & 0x80 != 0 { RMT_ONE } else { RMT_ZERO };
             g <<= 1;
         }
-        for i in 0..8 {
-            codes[1 * 8 + i] = if r & 0x80 != 0 { RMT_ONE } else { RMT_ZERO };
+        for code in &mut codes[8..16] {
+            *code = if r & 0x80 != 0 { RMT_ONE } else { RMT_ZERO };
             r <<= 1;
         }
-        for i in 0..8 {
-            codes[2 * 8 + i] = if b & 0x80 != 0 { RMT_ONE } else { RMT_ZERO };
+        for code in &mut codes[16..24] {
+            *code = if b & 0x80 != 0 { RMT_ONE } else { RMT_ZERO };
             b <<= 1;
         }
         codes
@@ -91,18 +100,6 @@ pub struct HSV {
     pub s: f32,
     pub v: f32,
 }
-
-impl Display for HSV {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "(h: {}, s: {}, v: {})", self.h, self.s, self.v)
-    }
-}
-//
-// impl Format for HSV {
-//     fn format(&self, fmt: defmt::Formatter) {
-//         write!(fmt, "(h: {}, s: {}, v: {})", self.h, self.s, self.v)
-//     }
-// }
 
 impl HSV {
     pub fn to_rgb(&self) -> RGB {
